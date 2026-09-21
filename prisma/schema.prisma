@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  profile      Profile?
+  applications Application[]
+  chatMessages ChatMessage[]
+}
+
+model Profile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline      String?
+  location      String?
+  workModel     String? // remote | hybrid | onsite | any
+  experienceLevel String? // entry | mid | senior | lead
+  skills        String   @default("[]") // JSON array
+  resumeText    String?
+  resumeSummary String?
+  targetTitles  String   @default("[]") // JSON array
+  updatedAt     DateTime @updatedAt
+}
+
+model Job {
+  id          String         @id @default(cuid())
+  title       String
+  company     String
+  location    String
+  workModel   String // remote | hybrid | onsite
+  experience  String // entry | mid | senior | lead
+  salaryMin   Int?
+  salaryMax   Int?
+  currency    String         @default("USD")
+  description String
+  requirements String
+  skills      String         @default("[]") // JSON array
+  sourceUrl   String?
+  postedAt    DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  applications Application[]
+}
+
+model Application {
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status    String   @default("saved") // saved | applied | interview | offer | rejected
+  notes     String?
+  matchScore Int?
+  tailoredResume String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, jobId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String // user | assistant
+  content   String
+  createdAt DateTime @default(now())
+}

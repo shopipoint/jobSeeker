@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JobSeeker
 
-## Getting Started
+Self-hosted AI job search copilot inspired by [Jobright](https://jobright.ai/).
 
-First, run the development server:
+## Features
+
+- **Personalized job matching** from your resume/skills (local scoring; optional LLM enrichment)
+- **Resume profile** with skill extraction
+- **Job-specific resume tailoring** (OpenAI-compatible API or local fallback)
+- **Application tracker** (saved → applied → interview → offer → rejected)
+- **Career copilot** chat
+- **Docker Compose** one-command deploy
+
+## Quick start (local)
 
 ```bash
+cp .env.example .env
+npm install
+npx prisma migrate dev --name init
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000), register an account, paste a resume, then open **Jobs → AI matches**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Optional AI
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Set in `.env`:
 
-## Learn More
+```env
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+```
 
-To learn more about Next.js, take a look at the following resources:
+Point `OPENAI_BASE_URL` at **Ollama**, OpenRouter, Azure OpenAI, or any OpenAI-compatible server. Without a key, matching, tailoring, and copilot still work with local heuristics.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Docker
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+export AUTH_SECRET="$(openssl rand -hex 32)"
+# optional
+export OPENAI_API_KEY=sk-...
+docker compose up --build
+```
 
-## Deploy on Vercel
+App: [http://localhost:3000](http://localhost:3000)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+SQLite data persists in the `jobseeker-data` volume.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Scope vs Jobright
+
+This MVP covers the core self-hostable loop. Not included (yet): browser autofill extensions, live scrapes of every ATS, or LinkedIn-style insider referral graphs.
+
+## License
+
+MIT — for personal / team self-hosting. Not affiliated with Jobright.
