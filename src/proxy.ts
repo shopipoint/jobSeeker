@@ -11,6 +11,8 @@ export function proxy(request: NextRequest) {
     "/resume",
     "/applications",
     "/copilot",
+    "/profile",
+    "/team",
   ];
   const isProtected = protectedPaths.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
@@ -39,6 +41,8 @@ export const config = {
     "/resume/:path*",
     "/applications/:path*",
     "/copilot/:path*",
+    "/profile/:path*",
+    "/team/:path*",
     "/login",
     "/register",
   ],

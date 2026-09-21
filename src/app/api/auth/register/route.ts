@@ -17,11 +17,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email already registered" }, { status: 409 });
     }
 
+    const freePlan = await prisma.subscriptionPlan.findUnique({ where: { code: "free" } });
+
     const user = await prisma.user.create({
       data: {
         name: body.name,
         email: body.email.toLowerCase(),
         passwordHash: await hashPassword(body.password),
+        role: "DEVELOPER",
         profile: {
           create: {
             headline: "Job seeker",
@@ -31,6 +34,20 @@ export async function POST(request: Request) {
             targetTitles: "[]",
           },
         },
+        settings: {
+          create: {},
+        },
+        ...(freePlan
+          ? {
+              subscription: {
+                create: {
+                  planId: freePlan.id,
+                  status: "active",
+                  billingInterval: "monthly",
+                },
+              },
+            }
+          : {}),
       },
     });
 
@@ -39,10 +56,14 @@ export async function POST(request: Request) {
       id: user.id,
       email: user.email,
       name: user.name,
+      role: user.role,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues[0]?.message || "Invalid input" }, { status: 400 });
+      return NextResponse.json(
+        { error: error.issues[0]?.message || "Invalid input" },
+        { status: 400 },
+      );
     }
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }

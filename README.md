@@ -2,6 +2,8 @@
 
 Self-hosted AI job search copilot inspired by [Jobright](https://jobright.ai/).
 
+**Current release:** `v1.0` (MVP) + RBAC/profile follow-up on `main`.
+
 ## Features
 
 - **Personalized job matching** from your resume/skills (local scoring; optional LLM enrichment)
@@ -9,6 +11,9 @@ Self-hosted AI job search copilot inspired by [Jobright](https://jobright.ai/).
 - **Job-specific resume tailoring** (OpenAI-compatible API or local fallback)
 - **Application tracker** (saved → applied → interview → offer → rejected)
 - **Career copilot** chat
+- **RBAC** — Super Admin → Project Manager → Bidder / Caller / Developer ([docs/RBAC.md](docs/RBAC.md))
+- **Profile & settings** — account, career, notifications, security, role/permissions, plan preview
+- **Subscriptions planned for v2** — schema + UI preview ([docs/SUBSCRIPTIONS.md](docs/SUBSCRIPTIONS.md))
 - **Docker Compose** one-command deploy
 
 ## Quick start (local)
@@ -16,16 +21,26 @@ Self-hosted AI job search copilot inspired by [Jobright](https://jobright.ai/).
 ```bash
 cp .env.example .env
 npm install
-npx prisma migrate dev --name init
+npx prisma migrate dev
 npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), register an account, paste a resume, then open **Jobs → AI matches**.
+Open [http://localhost:3000](http://localhost:3000).
+
+### Demo accounts (after seed)
+
+| Email | Role | Password |
+|---|---|---|
+| `admin@jobseeker.local` | Super Admin | `password123` |
+| `pm@jobseeker.local` | Project Manager | `password123` |
+| `bidder@jobseeker.local` | Bidder | `password123` |
+| `caller@jobseeker.local` | Caller | `password123` |
+| `dev@jobseeker.local` | Developer | `password123` |
+
+Self-registration defaults to **Developer**.
 
 ### Optional AI
-
-Set in `.env`:
 
 ```env
 OPENAI_API_KEY=sk-...
@@ -33,24 +48,14 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-Point `OPENAI_BASE_URL` at **Ollama**, OpenRouter, Azure OpenAI, or any OpenAI-compatible server. Without a key, matching, tailoring, and copilot still work with local heuristics.
+Point `OPENAI_BASE_URL` at **Ollama**, OpenRouter, Azure OpenAI, or any OpenAI-compatible server.
 
 ## Docker
 
 ```bash
 export AUTH_SECRET="$(openssl rand -hex 32)"
-# optional
-export OPENAI_API_KEY=sk-...
 docker compose up --build
 ```
-
-App: [http://localhost:3000](http://localhost:3000)
-
-SQLite data persists in the `jobseeker-data` volume.
-
-## Scope vs Jobright
-
-This MVP covers the core self-hostable loop. Not included (yet): browser autofill extensions, live scrapes of every ATS, or LinkedIn-style insider referral graphs.
 
 ## License
 

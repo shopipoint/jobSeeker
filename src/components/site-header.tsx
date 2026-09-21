@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { hasAnyPermission, type Permission } from "@/lib/rbac";
 
 export function SiteHeader({
   authed,
@@ -12,6 +14,24 @@ export function SiteHeader({
   dense?: boolean;
   appName?: string;
 }) {
+  const [canManageTeam, setCanManageTeam] = useState(false);
+
+  useEffect(() => {
+    if (!authed) return;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        const perms = (data.user?.permissions || []) as Permission[];
+        setCanManageTeam(
+          hasAnyPermission(
+            data.user?.role || "DEVELOPER",
+            ["users:view", "team:manage"],
+          ) || perms.includes("users:view") || perms.includes("team:manage"),
+        );
+      })
+      .catch(() => undefined);
+  }, [authed]);
+
   return (
     <header
       className={cn(
@@ -34,6 +54,8 @@ export function SiteHeader({
               <NavLink href="/resume">Resume</NavLink>
               <NavLink href="/applications">Tracker</NavLink>
               <NavLink href="/copilot">Copilot</NavLink>
+              <NavLink href="/profile">Profile</NavLink>
+              {canManageTeam ? <NavLink href="/team">Team</NavLink> : null}
               <button
                 type="button"
                 className="rounded-lg px-3 py-2 text-slate-400 hover:bg-white/5 hover:text-white"

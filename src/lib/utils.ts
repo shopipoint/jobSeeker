@@ -30,13 +30,14 @@ export function toJsonArray(values: string[]): string {
 export function formatSalary(
   min?: number | null,
   max?: number | null,
-  currency = "USD",
+  currency?: string | null,
 ): string {
+  const cur = currency || "USD";
   if (!min && !max) return "Not listed";
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency,
+      currency: cur,
       maximumFractionDigits: 0,
     }).format(n);
   if (min && max) return `${fmt(min)} – ${fmt(max)}`;

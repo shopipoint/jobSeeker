@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -155,16 +156,171 @@ const jobs = [
   },
 ];
 
-async function main() {
+const plans = [
+  {
+    code: "free",
+    name: "Free",
+    description: "Core job matching and tracking for individuals.",
+    priceMonthlyCents: 0,
+    priceYearlyCents: 0,
+    maxSeats: 1,
+    maxApplications: 50,
+    maxAiRequests: 20,
+    featuresJson: JSON.stringify(["Job matches", "Application tracker", "Local AI fallback"]),
+    sortOrder: 1,
+  },
+  {
+    code: "pro",
+    name: "Pro",
+    description: "Higher AI limits and tailored resume volume.",
+    priceMonthlyCents: 2900,
+    priceYearlyCents: 29000,
+    maxSeats: 1,
+    maxApplications: 300,
+    maxAiRequests: 500,
+    featuresJson: JSON.stringify([
+      "Everything in Free",
+      "Priority matching",
+      "Resume tailoring credits",
+    ]),
+    sortOrder: 2,
+  },
+  {
+    code: "team",
+    name: "Team",
+    description: "For Project Managers with Bidder / Caller / Developer seats.",
+    priceMonthlyCents: 9900,
+    priceYearlyCents: 99000,
+    maxSeats: 10,
+    maxApplications: 2000,
+    maxAiRequests: 2000,
+    featuresJson: JSON.stringify([
+      "Everything in Pro",
+      "Team RBAC",
+      "Shared pipeline",
+      "Seat management",
+    ]),
+    sortOrder: 3,
+  },
+  {
+    code: "enterprise",
+    name: "Enterprise",
+    description: "Custom limits, SSO, and dedicated support (v2+).",
+    priceMonthlyCents: 0,
+    priceYearlyCents: 0,
+    maxSeats: 100,
+    maxApplications: 100000,
+    maxAiRequests: 100000,
+    featuresJson: JSON.stringify(["SSO", "Audit exports", "Custom SLAs", "Dedicated support"]),
+    sortOrder: 4,
+  },
+];
+
+async function seedPlans() {
+  for (const plan of plans) {
+    await prisma.subscriptionPlan.upsert({
+      where: { code: plan.code },
+      create: plan,
+      update: plan,
+    });
+  }
+  console.log(`Seeded ${plans.length} subscription plans`);
+}
+
+async function seedUsers() {
+  const freePlan = await prisma.subscriptionPlan.findUnique({ where: { code: "free" } });
+  const teamPlan = await prisma.subscriptionPlan.findUnique({ where: { code: "team" } });
+  const passwordHash = await bcrypt.hash("password123", 10);
+
+  async function ensureUser(data: {
+    email: string;
+    name: string;
+    role: string;
+    managerId?: string | null;
+    planId?: string | null;
+  }) {
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) return existing;
+    return prisma.user.create({
+      data: {
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        passwordHash,
+        managerId: data.managerId ?? null,
+        profile: {
+          create: {
+            headline: data.role,
+            skills: "[]",
+            targetTitles: "[]",
+          },
+        },
+        settings: { create: {} },
+        ...(data.planId
+          ? {
+              subscription: {
+                create: {
+                  planId: data.planId,
+                  status: "active",
+                  billingInterval: "monthly",
+                },
+              },
+            }
+          : {}),
+      },
+    });
+  }
+
+  const admin = await ensureUser({
+    email: "admin@jobseeker.local",
+    name: "Super Admin",
+    role: "SUPER_ADMIN",
+    planId: teamPlan?.id || freePlan?.id,
+  });
+
+  const pm = await ensureUser({
+    email: "pm@jobseeker.local",
+    name: "Jordan Lee",
+    role: "PROJECT_MANAGER",
+    planId: teamPlan?.id || freePlan?.id,
+  });
+
+  await ensureUser({
+    email: "bidder@jobseeker.local",
+    name: "Sam Bidder",
+    role: "BIDDER",
+    managerId: pm.id,
+    planId: freePlan?.id,
+  });
+  await ensureUser({
+    email: "caller@jobseeker.local",
+    name: "Casey Caller",
+    role: "CALLER",
+    managerId: pm.id,
+    planId: freePlan?.id,
+  });
+  await ensureUser({
+    email: "dev@jobseeker.local",
+    name: "Dev Rivera",
+    role: "DEVELOPER",
+    managerId: pm.id,
+    planId: freePlan?.id,
+  });
+
+  console.log("Seeded demo users (password: password123)");
+  console.log(`  admin: ${admin.email}`);
+  console.log(`  pm:    ${pm.email}`);
+}
+
+async function seedJobs() {
   const existing = await prisma.job.count();
   if (existing > 0 && process.env.FORCE_SEED !== "true") {
-    console.log(`Skipping seed (${existing} jobs already present). Set FORCE_SEED=true to replace.`);
+    console.log(`Skipping jobs seed (${existing} jobs already present).`);
     return;
   }
 
   if (process.env.FORCE_SEED === "true") {
     await prisma.application.deleteMany();
-    await prisma.chatMessage.deleteMany();
     await prisma.job.deleteMany();
   }
 
@@ -176,8 +332,13 @@ async function main() {
       },
     });
   }
-
   console.log(`Seeded ${jobs.length} jobs`);
+}
+
+async function main() {
+  await seedPlans();
+  await seedUsers();
+  await seedJobs();
 }
 
 main()

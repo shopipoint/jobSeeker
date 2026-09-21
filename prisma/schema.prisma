@@ -7,64 +7,94 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Hierarchy: SUPER_ADMIN > PROJECT_MANAGER > BIDDER | CALLER | DEVELOPER
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
+  id           String   @id @default(cuid())
+  email        String   @unique
   passwordHash String
   name         String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  profile      Profile?
-  applications Application[]
-  chatMessages ChatMessage[]
+  role         String   @default("DEVELOPER") // SUPER_ADMIN | PROJECT_MANAGER | BIDDER | CALLER | DEVELOPER
+  isActive     Boolean  @default(true)
+  managerId    String?
+  manager      User?    @relation("TeamHierarchy", fields: [managerId], references: [id])
+  reports      User[]   @relation("TeamHierarchy")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile       Profile?
+  settings      UserSettings?
+  applications  Application[]
+  chatMessages  ChatMessage[]
+  subscription  UserSubscription?
+  auditLogs     AuditLog[]        @relation("ActorLogs")
 }
 
 model Profile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  headline      String?
-  location      String?
-  workModel     String? // remote | hybrid | onsite | any
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline        String?
+  location        String?
+  phone           String?
+  bio             String?
+  workModel       String? // remote | hybrid | onsite | any
   experienceLevel String? // entry | mid | senior | lead
-  skills        String   @default("[]") // JSON array
-  resumeText    String?
-  resumeSummary String?
-  targetTitles  String   @default("[]") // JSON array
-  updatedAt     DateTime @updatedAt
+  skills          String   @default("[]") // JSON array
+  resumeText      String?
+  resumeSummary   String?
+  targetTitles    String   @default("[]") // JSON array
+  timezone        String   @default("UTC")
+  updatedAt       DateTime @updatedAt
+}
+
+/// All user-facing configuration lives here (also editable on Profile page)
+model UserSettings {
+  id                 String  @id @default(cuid())
+  userId             String  @unique
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifyEmail        Boolean @default(true)
+  notifyInApp        Boolean @default(true)
+  notifyMatchAlerts  Boolean @default(true)
+  notifyAppUpdates   Boolean @default(true)
+  preferredLanguage  String  @default("en")
+  theme              String  @default("dark") // dark | light | system
+  defaultWorkModel   String  @default("any")
+  defaultExperience  String  @default("mid")
+  aiAssistEnabled    Boolean @default(true)
+  weeklyDigest       Boolean @default(false)
 }
 
 model Job {
-  id          String         @id @default(cuid())
-  title       String
-  company     String
-  location    String
-  workModel   String // remote | hybrid | onsite
-  experience  String // entry | mid | senior | lead
-  salaryMin   Int?
-  salaryMax   Int?
-  currency    String         @default("USD")
-  description String
+  id           String         @id @default(cuid())
+  title        String
+  company      String
+  location     String
+  workModel    String // remote | hybrid | onsite
+  experience   String // entry | mid | senior | lead
+  salaryMin    Int?
+  salaryMax    Int?
+  currency     String         @default("USD")
+  description  String
   requirements String
-  skills      String         @default("[]") // JSON array
-  sourceUrl   String?
-  postedAt    DateTime       @default(now())
-  createdAt   DateTime       @default(now())
+  skills       String         @default("[]") // JSON array
+  sourceUrl    String?
+  postedAt     DateTime       @default(now())
+  createdAt    DateTime       @default(now())
   applications Application[]
 }
 
 model Application {
-  id        String   @id @default(cuid())
-  userId    String
-  jobId     String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  status    String   @default("saved") // saved | applied | interview | offer | rejected
-  notes     String?
-  matchScore Int?
+  id             String   @id @default(cuid())
+  userId         String
+  jobId          String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status         String   @default("saved") // saved | applied | interview | offer | rejected
+  notes          String?
+  matchScore     Int?
   tailoredResume String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([userId, jobId])
 }
@@ -76,4 +106,52 @@ model ChatMessage {
   role      String // user | assistant
   content   String
   createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("ActorLogs", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String?
+  targetId   String?
+  meta       String   @default("{}")
+  createdAt  DateTime @default(now())
+}
+
+// --- Subscription (planned for v2; schema ready, billing not wired) ---
+
+model SubscriptionPlan {
+  id              String             @id @default(cuid())
+  code            String             @unique // free | pro | team | enterprise
+  name            String
+  description     String
+  priceMonthlyCents Int              @default(0)
+  priceYearlyCents  Int              @default(0)
+  currency        String             @default("USD")
+  maxSeats        Int                @default(1)
+  maxApplications Int                @default(50)
+  maxAiRequests   Int                @default(20)
+  featuresJson    String             @default("[]")
+  isActive        Boolean            @default(true)
+  sortOrder       Int                @default(0)
+  createdAt       DateTime           @default(now())
+  subscriptions   UserSubscription[]
+}
+
+model UserSubscription {
+  id                 String           @id @default(cuid())
+  userId             String           @unique
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               SubscriptionPlan @relation(fields: [planId], references: [id])
+  status             String           @default("active") // active | trialing | past_due | canceled | planned
+  billingInterval    String           @default("monthly") // monthly | yearly
+  currentPeriodStart DateTime         @default(now())
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean          @default(false)
+  externalCustomerId String? // Stripe/etc. (v2)
+  externalSubId      String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 }

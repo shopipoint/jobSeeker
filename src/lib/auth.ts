@@ -2,6 +2,12 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
+import {
+  type Permission,
+  type Role,
+  hasPermission,
+  normalizeRole,
+} from "./rbac";
 
 const COOKIE_NAME = "jobseeker_session";
 
@@ -56,16 +62,35 @@ export async function getSessionUserId(): Promise<string | null> {
 export async function getCurrentUser() {
   const userId = await getSessionUserId();
   if (!userId) return null;
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { profile: true },
+    include: {
+      profile: true,
+      settings: true,
+      subscription: { include: { plan: true } },
+      manager: { select: { id: true, name: true, email: true, role: true } },
+    },
   });
+  if (!user || !user.isActive) return null;
+  return user;
 }
 
 export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) throw new Error("UNAUTHORIZED");
   return user;
+}
+
+export async function requirePermission(permission: Permission) {
+  const user = await requireUser();
+  if (!hasPermission(user.role, permission)) {
+    throw new Error("FORBIDDEN");
+  }
+  return user;
+}
+
+export function userRole(user: { role: string }): Role {
+  return normalizeRole(user.role);
 }
 
 export { COOKIE_NAME };
