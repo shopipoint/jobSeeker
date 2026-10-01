@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Generate the client at build time. Runtime uses the real Supabase URLs.
+ENV DATABASE_URL="postgresql://localhost:5432/postgres"
+ENV DIRECT_URL="postgresql://localhost:5432/postgres"
 RUN npx prisma generate && npm run build
 
 FROM node:22-bookworm-slim AS runner
